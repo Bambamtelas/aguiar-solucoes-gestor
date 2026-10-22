@@ -1846,9 +1846,8 @@ function startWhatsAppAutomationScheduler() {
         const currentMorningKey = `${todayIso}_MANHA_${morningTime}`;
         const lastRunMorningKey = (config as any).last_run_morning || (config as any).last_run_schedule || '';
 
-        if (isMorningEnabled && brTime >= morningTime && lastRunMorningKey !== currentMorningKey) {
-          console.log(`[WhatsApp Scheduler] ☀️ Período da Manhã atingido (${morningTime} / atual: ${brTime}). Disparando avisos para ${tenant.name} (${tenantId}) em segundo plano.`);
-          // ATENÇÃO: Salva a chave IMEDIATAMENTE ANTES do disparo para blindar contra ticks sobrepostos a cada 30 segundos
+        if (isMorningEnabled && brTime === morningTime && lastRunMorningKey !== currentMorningKey) {
+          console.log(`[WhatsApp Scheduler] ☀️ Horário exato da Manhã atingido (${morningTime}). Disparando avisos para ${tenant.name} (${tenantId}).`);
           (config as any).last_run_morning = currentMorningKey;
           (config as any).last_run_schedule = currentMorningKey;
           config.last_run_at = new Date().toISOString();
@@ -1872,9 +1871,8 @@ function startWhatsAppAutomationScheduler() {
         const currentAfternoonKey = `${todayIso}_TARDE_${afternoonTime}`;
         const lastRunAfternoonKey = (config as any).last_run_afternoon || (config as any).last_run_schedule_second || '';
 
-        if (isAfternoonEnabled && brTime >= afternoonTime && lastRunAfternoonKey !== currentAfternoonKey) {
-          console.log(`[WhatsApp Scheduler] ⛅ Período da Tarde atingido (${afternoonTime} / atual: ${brTime}). Disparando avisos para ${tenant.name} (${tenantId}) em segundo plano.`);
-          // ATENÇÃO: Salva a chave IMEDIATAMENTE ANTES do disparo para blindar contra ticks sobrepostos a cada 30 segundos
+        if (isAfternoonEnabled && brTime === afternoonTime && lastRunAfternoonKey !== currentAfternoonKey) {
+          console.log(`[WhatsApp Scheduler] ⛅ Horário exato da Tarde atingido (${afternoonTime}). Disparando avisos para ${tenant.name} (${tenantId}).`);
           (config as any).last_run_afternoon = currentAfternoonKey;
           (config as any).last_run_schedule_second = currentAfternoonKey;
           config.last_run_at = new Date().toISOString();
@@ -1898,9 +1896,8 @@ function startWhatsAppAutomationScheduler() {
         const currentNightKey = `${todayIso}_NOITE_${nightTime}`;
         const lastRunNightKey = (config as any).last_run_night || '';
 
-        if (isNightEnabled && brTime >= nightTime && lastRunNightKey !== currentNightKey) {
-          console.log(`[WhatsApp Scheduler] 🌙 Período da Noite atingido (${nightTime} / atual: ${brTime}). Disparando avisos para ${tenant.name} (${tenantId}) em segundo plano.`);
-          // ATENÇÃO: Salva a chave IMEDIATAMENTE ANTES do disparo para blindar contra ticks sobrepostos a cada 30 segundos
+        if (isNightEnabled && brTime === nightTime && lastRunNightKey !== currentNightKey) {
+          console.log(`[WhatsApp Scheduler] 🌙 Horário exato da Noite atingido (${nightTime}). Disparando avisos para ${tenant.name} (${tenantId}).`);
           (config as any).last_run_night = currentNightKey;
           config.last_run_at = new Date().toISOString();
           store.saveWhatsAppConfig(tenantId, config);
