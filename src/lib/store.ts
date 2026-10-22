@@ -2475,11 +2475,57 @@ class DataStore {
   // ----------------------------------------------------
   public getLoans(tenantId?: string): Loan[] {
     const diskLoans = this.loadFile<Loan>(FILE_LOANS);
-    if (diskLoans && Array.isArray(diskLoans)) {
+    if (diskLoans && Array.isArray(diskLoans) && (diskLoans.length > 0 || this.loans.length === 0)) {
       this.loans = diskLoans;
     }
     if (!tenantId) return this.loans;
     return this.loans.filter((l) => l.tenantId === tenantId);
+  }
+
+  public async getLoansAsync(tenantId?: string): Promise<Loan[]> {
+    if (isSupabaseConfigured()) {
+      try {
+        const client = getSupabaseClient();
+        if (client) {
+          let query = client.from('loans').select('*').order('created_at', { ascending: false });
+          if (tenantId) {
+            query = query.eq('tenant_id', tenantId);
+          }
+          const { data, error } = await query;
+          if (!error && Array.isArray(data)) {
+            const mappedLoans: Loan[] = data.map((l: any) => ({
+              id: l.id,
+              tenantId: l.tenant_id,
+              customerName: l.customer_name,
+              customerPhone: l.customer_phone || '',
+              description: l.description || '',
+              principalAmount: Number(l.principal_amount),
+              dueDate: l.due_date ? String(l.due_date).split('T')[0] : '',
+              isRecurringOrInstallment: Boolean(l.is_recurring_or_installment),
+              billingType: l.billing_type || 'single',
+              installmentsCount: Number(l.installments_count || 1),
+              frequency: l.frequency || 'monthly',
+              paymentMethod: l.payment_method || 'pix',
+              instructions: l.instructions || '',
+              status: l.status || 'active',
+              totalToReceive: Number(l.total_to_receive || l.principal_amount),
+              installments: Array.isArray(l.installments) ? l.installments : [],
+              createdAt: l.created_at,
+            }));
+
+            const diskLoans = this.loadFile<Loan>(FILE_LOANS) || this.loans;
+            const otherLoans = (Array.isArray(diskLoans) ? diskLoans : this.loans).filter(
+              (l) => (tenantId ? l.tenantId !== tenantId : false)
+            );
+            this.loans = [...mappedLoans, ...otherLoans];
+            this.saveFile(FILE_LOANS, this.loans);
+          }
+        }
+      } catch (err) {
+        console.warn('[Store] Falha ao consultar empréstimos no Supabase:', err);
+      }
+    }
+    return this.getLoans(tenantId);
   }
 
   public saveLoan(loan: Loan): Loan {
@@ -2490,6 +2536,35 @@ class DataStore {
       this.loans.unshift(loan);
     }
     this.persist();
+
+    if (isSupabaseConfigured()) {
+      try {
+        const client = getSupabaseClient();
+        if (client) {
+          client.from('loans').upsert({
+            id: loan.id,
+            tenant_id: loan.tenantId,
+            customer_name: loan.customerName,
+            customer_phone: loan.customerPhone || null,
+            description: loan.description || null,
+            principal_amount: loan.principalAmount,
+            due_date: loan.dueDate,
+            is_recurring_or_installment: Boolean(loan.isRecurringOrInstallment),
+            billing_type: loan.billingType || 'single',
+            installments_count: loan.installmentsCount || 1,
+            frequency: loan.frequency || 'monthly',
+            payment_method: loan.paymentMethod || 'pix',
+            instructions: loan.instructions || null,
+            status: loan.status || 'active',
+            total_to_receive: loan.totalToReceive || loan.principalAmount,
+            installments: loan.installments || [],
+            created_at: loan.createdAt || new Date().toISOString(),
+            updated_at: new Date().toISOString(),
+          }).then(() => {}).catch(() => {});
+        }
+      } catch {}
+    }
+
     return loan;
   }
 
@@ -2501,6 +2576,33 @@ class DataStore {
       ...updates,
     };
     this.persist();
+
+    if (isSupabaseConfigured()) {
+      try {
+        const client = getSupabaseClient();
+        if (client) {
+          const row: any = { updated_at: new Date().toISOString() };
+          const l = this.loans[index];
+          if (l.customerName) row.customer_name = l.customerName;
+          if (l.customerPhone !== undefined) row.customer_phone = l.customerPhone;
+          if (l.description !== undefined) row.description = l.description;
+          if (l.principalAmount !== undefined) row.principal_amount = l.principalAmount;
+          if (l.dueDate) row.due_date = l.dueDate;
+          if (l.isRecurringOrInstallment !== undefined) row.is_recurring_or_installment = l.isRecurringOrInstallment;
+          if (l.billingType) row.billing_type = l.billingType;
+          if (l.installmentsCount) row.installments_count = l.installmentsCount;
+          if (l.frequency) row.frequency = l.frequency;
+          if (l.paymentMethod) row.payment_method = l.paymentMethod;
+          if (l.instructions !== undefined) row.instructions = l.instructions;
+          if (l.status) row.status = l.status;
+          if (l.totalToReceive) row.total_to_receive = l.totalToReceive;
+          if (l.installments) row.installments = l.installments;
+
+          client.from('loans').update(row).eq('id', id).then(() => {}).catch(() => {});
+        }
+      } catch {}
+    }
+
     return this.loans[index];
   }
 
@@ -2508,7 +2610,17 @@ class DataStore {
     const initialLen = this.loans.length;
     this.loans = this.loans.filter((l) => l.id !== id);
     const deleted = this.loans.length < initialLen;
-    if (deleted) this.persist();
+    if (deleted) {
+      this.persist();
+      if (isSupabaseConfigured()) {
+        try {
+          const client = getSupabaseClient();
+          if (client) {
+            client.from('loans').delete().eq('id', id).then(() => {}).catch(() => {});
+          }
+        } catch {}
+      }
+    }
     return deleted;
   }
 

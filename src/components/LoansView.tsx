@@ -110,25 +110,55 @@ export const LoansView: React.FC<LoansViewProps> = ({ tenant }) => {
     try {
       if (showLoadingSpinner) setLoading(true);
 
+      let loadedLoans: Loan[] = [];
+
+      // 1. Tenta carregar direto do Supabase via client oficial
       if (isSupabaseConfigured) {
-        const remoteLoans = await loadLoansFromSupabase(tenantId);
-        setLoans(remoteLoans);
-        localStorage.setItem(storageKey, JSON.stringify(remoteLoans));
-      } else {
-        const remoteLoans = await api.getLoans(tenantId);
-        if (Array.isArray(remoteLoans) && remoteLoans.length > 0) {
-          setLoans(remoteLoans);
-          localStorage.setItem(storageKey, JSON.stringify(remoteLoans));
+        try {
+          const directSbLoans = await loadLoansFromSupabase(tenantId);
+          if (Array.isArray(directSbLoans) && directSbLoans.length > 0) {
+            loadedLoans = directSbLoans;
+          }
+        } catch (sbErr) {
+          console.warn('[LoansView] Aviso ao consultar Supabase direto:', sbErr);
         }
       }
+
+      // 2. Se vazio ou se Supabase direto oscilou, consulta a API backend (que sincroniza com Supabase)
+      if (!loadedLoans || loadedLoans.length === 0) {
+        try {
+          const apiLoans = await api.getLoans(tenantId);
+          if (Array.isArray(apiLoans) && apiLoans.length > 0) {
+            loadedLoans = apiLoans;
+          }
+        } catch (apiErr) {
+          console.warn('[LoansView] Aviso ao consultar /api/loans:', apiErr);
+        }
+      }
+
+      // 3. Atualiza estado e cache se encontrou dados
+      if (Array.isArray(loadedLoans) && loadedLoans.length > 0) {
+        setLoans(loadedLoans);
+        localStorage.setItem(storageKey, JSON.stringify(loadedLoans));
+      } else {
+        // Se ainda estiver vazio, tenta cache local offline
+        try {
+          const saved = localStorage.getItem(storageKey);
+          if (saved) {
+            const localParsed = JSON.parse(saved);
+            if (Array.isArray(localParsed) && localParsed.length > 0) {
+              setLoans(localParsed);
+            }
+          }
+        } catch {}
+      }
     } catch (err: any) {
-      console.warn('[LoansView] Erro ao sincronizar com Supabase:', err?.message || err);
-      // Fallback para cache local caso esteja offline
+      console.warn('[LoansView] Erro ao sincronizar empréstimos:', err?.message || err);
       try {
         const saved = localStorage.getItem(storageKey);
         if (saved) {
           const localParsed = JSON.parse(saved);
-          if (Array.isArray(localParsed)) setLoans(localParsed);
+          if (Array.isArray(localParsed) && localParsed.length > 0) setLoans(localParsed);
         }
       } catch {}
     } finally {
