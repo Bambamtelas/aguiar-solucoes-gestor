@@ -342,21 +342,8 @@ export async function getOrInitBaileysInstance(
     const sessionDir = getSessionPath(instanceName);
     const credsPath = path.join(sessionDir, 'creds.json');
 
-    // Detecta se a sessão existente está corrompida ou deslogada (registered === false)
-    let isStaleSession = false;
-    if (fs.existsSync(credsPath)) {
-      try {
-        const c = JSON.parse(fs.readFileSync(credsPath, 'utf-8'));
-        if (c && c.registered === false) {
-          isStaleSession = true;
-        }
-      } catch {
-        isStaleSession = true;
-      }
-    }
-
-    if (options.forceRestart || isStaleSession) {
-      // Remove session directory to allow clean re-pairing
+    if (options.forceRestart) {
+      // Remove session directory ONLY when explicit restart/clear is requested
       try {
         fs.rmSync(sessionDir, { recursive: true, force: true });
         fs.mkdirSync(sessionDir, { recursive: true });
@@ -515,7 +502,7 @@ export async function getOrInitBaileysInstance(
             // Mantém como 'connecting' para evitar que checagens de status resetem a instância para desconectada
             sessionData.state = 'connecting';
 
-            const delay = isRestartRequired ? 1200 : 3000;
+            const delay = isRestartRequired ? 400 : 3000;
             setTimeout(() => {
               getOrInitBaileysInstance(instanceName).catch((err) =>
                 console.error('[Baileys] Reconnect failed:', err)
@@ -667,7 +654,7 @@ export function getBaileysStatus(instanceName: string) {
     const isConnected = session.state === 'open';
     const isReconnecting = session.state === 'connecting' && Boolean(session.ownerPhone);
     return {
-      connected: isConnected || isReconnecting,
+      connected: isConnected,
       isReconnecting,
       state: session.state,
       ownerPhone: session.ownerPhone,
@@ -679,7 +666,7 @@ export function getBaileysStatus(instanceName: string) {
       message: isConnected
         ? `Conectado com sucesso (${session.ownerPhone || 'WhatsApp Ativo'})`
         : isReconnecting
-        ? `Reconectando ao WhatsApp (${session.ownerPhone})...`
+        ? `Finalizando conexão com o WhatsApp (${session.ownerPhone})...`
         : session.state === 'waiting_qr'
         ? 'Aguardando leitura do QR Code pelo WhatsApp'
         : session.state === 'connecting'

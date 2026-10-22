@@ -741,6 +741,10 @@ export const WhatsAppAutomationView: React.FC<WhatsAppAutomationViewProps> = ({ 
         setConnectionSuccessAlert(`🎉 WhatsApp conectado com sucesso à instância "${actualInst}"! O número ${connectedPhone} está ativo para disparos automáticos.`);
         setTimeout(() => setConnectionSuccessAlert(null), 8000);
         return;
+      } else if ((res as any)?.isReconnecting) {
+        setPairingStatusInfo('Conexão detectada! Finalizando autenticação com seu aparelho...');
+        alert('⏳ O WhatsApp está finalizando a autenticação com seu celular neste momento! Aguarde alguns segundos.');
+        return;
       } else {
         // Se ainda não detectou o escaneamento na API/WhatsApp
         setPairingStatusInfo(`Aguardando leitura do QR Code no aparelho... (${res?.message || 'ainda não escaneado'})`);
