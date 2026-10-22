@@ -48,8 +48,30 @@ const fetch = (input: RequestInfo | URL, init?: RequestInit) => fetchWithRetry(i
 export const api = {
   // Plan Prices
   async getGlobalPlanPrices(): Promise<GlobalPlanPrices> {
-    const res = await fetch(`/api/plans/prices?_t=${Date.now()}`);
-    return res.json();
+    try {
+      const res = await fetch(`/api/plans/prices?_t=${Date.now()}`);
+      if (res.ok) {
+        const data = await res.json();
+        if (data && typeof data === 'object') {
+          try {
+            localStorage.setItem('cached_global_plan_prices', JSON.stringify(data));
+          } catch {}
+          return data;
+        }
+      }
+    } catch (err) {
+      console.warn('Erro ao carregar preços globais da API:', err);
+    }
+    try {
+      const cached = localStorage.getItem('cached_global_plan_prices');
+      if (cached) return JSON.parse(cached);
+    } catch {}
+    return {
+      module_1: 24.9,
+      module_2: 39.9,
+      module_3: 49.9,
+      module_4: 69.9,
+    };
   },
 
   async updateGlobalPlanPrices(prices: Partial<GlobalPlanPrices>): Promise<GlobalPlanPrices> {
@@ -58,7 +80,11 @@ export const api = {
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(prices),
     });
-    return res.json();
+    const data = await res.json();
+    try {
+      localStorage.setItem('cached_global_plan_prices', JSON.stringify(data));
+    } catch {}
+    return data;
   },
 
   // External Link Config (Lojinha / Link Promocional)

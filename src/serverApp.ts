@@ -585,16 +585,21 @@ export function createApiApp(): Express {
   });
 
   // 6. Plan Prices Management (Admin Master)
-  app.get('/api/plans/prices', (_req: Request, res: Response) => {
+  app.get('/api/plans/prices', async (_req: Request, res: Response) => {
     res.setHeader('Cache-Control', 'no-cache, no-store, must-revalidate');
     res.setHeader('Pragma', 'no-cache');
     res.setHeader('Expires', '0');
-    res.json(store.getGlobalPlanPrices());
+    try {
+      const prices = await store.getGlobalPlanPricesAsync();
+      res.json(prices);
+    } catch {
+      res.json(store.getGlobalPlanPrices());
+    }
   });
 
-  app.put('/api/plans/prices', (req: Request, res: Response) => {
+  app.put('/api/plans/prices', async (req: Request, res: Response) => {
     try {
-      const updated = store.updateGlobalPlanPrices(req.body);
+      const updated = await store.updateGlobalPlanPrices(req.body);
       res.json(updated);
     } catch (err: any) {
       res.status(500).json({ error: 'Failed to update plan prices', details: err?.message });

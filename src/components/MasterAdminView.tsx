@@ -54,7 +54,12 @@ export const MasterAdminView: React.FC<MasterAdminViewProps> = ({ onTenantUpdate
 
   // Valores Globais dos Planos
   const [globalPrices, setGlobalPrices] = useState<GlobalPlanPrices>(DEFAULT_PLAN_PRICES);
-  const [editPrices, setEditPrices] = useState<GlobalPlanPrices>(DEFAULT_PLAN_PRICES);
+  const [editPrices, setEditPrices] = useState<{
+    module_1: string | number;
+    module_2: string | number;
+    module_3: string | number;
+    module_4: string | number;
+  }>({ ...DEFAULT_PLAN_PRICES });
   const [savingPrices, setSavingPrices] = useState(false);
   const [priceSuccessMsg, setPriceSuccessMsg] = useState<string | null>(null);
 
@@ -212,11 +217,20 @@ export const MasterAdminView: React.FC<MasterAdminViewProps> = ({ onTenantUpdate
     setSavingPrices(true);
     setPriceSuccessMsg(null);
     try {
+      const parseVal = (v: any, fallback: number): number => {
+        if (typeof v === 'number' && !isNaN(v) && v > 0) return Number(v.toFixed(2));
+        if (typeof v === 'string') {
+          const cleaned = parseFloat(v.replace(',', '.'));
+          if (!isNaN(cleaned) && cleaned > 0) return Number(cleaned.toFixed(2));
+        }
+        return fallback;
+      };
+
       const payload: GlobalPlanPrices = {
-        module_1: Number(editPrices.module_1) || DEFAULT_PLAN_PRICES.module_1,
-        module_2: Number(editPrices.module_2) || DEFAULT_PLAN_PRICES.module_2,
-        module_3: Number(editPrices.module_3) || DEFAULT_PLAN_PRICES.module_3,
-        module_4: Number(editPrices.module_4) || DEFAULT_PLAN_PRICES.module_4,
+        module_1: parseVal(editPrices.module_1, DEFAULT_PLAN_PRICES.module_1),
+        module_2: parseVal(editPrices.module_2, DEFAULT_PLAN_PRICES.module_2),
+        module_3: parseVal(editPrices.module_3, DEFAULT_PLAN_PRICES.module_3),
+        module_4: parseVal(editPrices.module_4, DEFAULT_PLAN_PRICES.module_4),
       };
       const updated = await api.updateGlobalPlanPrices(payload);
       setGlobalPrices(updated);
@@ -225,7 +239,7 @@ export const MasterAdminView: React.FC<MasterAdminViewProps> = ({ onTenantUpdate
       await fetchAdminData();
       setTimeout(() => setPriceSuccessMsg(null), 4000);
       if (onTenantUpdated) onTenantUpdated();
-    } catch (err) {
+    } catch (err: any) {
       console.error('Erro ao salvar preços dos planos:', err);
     } finally {
       setSavingPrices(false);
@@ -670,12 +684,11 @@ export const MasterAdminView: React.FC<MasterAdminViewProps> = ({ onTenantUpdate
             <div className="relative">
               <span className="absolute inset-y-0 left-0 pl-3 flex items-center text-xs font-bold text-slate-400">R$</span>
               <input
-                type="number"
-                step="0.10"
-                min="1"
+                type="text"
+                inputMode="decimal"
                 value={editPrices.module_1}
-                onChange={(e) => setEditPrices({ ...editPrices, module_1: parseFloat(e.target.value) || 0 })}
-                className="w-full pl-9 pr-3 py-2 bg-slate-900 border border-slate-700 rounded-lg text-sm font-bold text-white focus:outline-none focus:border-emerald-500"
+                onChange={(e) => setEditPrices({ ...editPrices, module_1: e.target.value })}
+                className="w-full pl-9 pr-3 py-2 bg-slate-900 border border-slate-700 rounded-lg text-sm font-bold text-white focus:outline-none focus:border-emerald-500 font-mono"
               />
             </div>
             <p className="text-[10px] text-slate-400">Empréstimo, IPTV, Negócios ou Assinaturas</p>
@@ -692,12 +705,11 @@ export const MasterAdminView: React.FC<MasterAdminViewProps> = ({ onTenantUpdate
             <div className="relative">
               <span className="absolute inset-y-0 left-0 pl-3 flex items-center text-xs font-bold text-slate-400">R$</span>
               <input
-                type="number"
-                step="0.10"
-                min="1"
+                type="text"
+                inputMode="decimal"
                 value={editPrices.module_2}
-                onChange={(e) => setEditPrices({ ...editPrices, module_2: parseFloat(e.target.value) || 0 })}
-                className="w-full pl-9 pr-3 py-2 bg-slate-900 border border-slate-700 rounded-lg text-sm font-bold text-white focus:outline-none focus:border-emerald-500"
+                onChange={(e) => setEditPrices({ ...editPrices, module_2: e.target.value })}
+                className="w-full pl-9 pr-3 py-2 bg-slate-900 border border-slate-700 rounded-lg text-sm font-bold text-white focus:outline-none focus:border-emerald-500 font-mono"
               />
             </div>
             <p className="text-[10px] text-slate-400">Escolha de 2 módulos integrados</p>
@@ -714,12 +726,11 @@ export const MasterAdminView: React.FC<MasterAdminViewProps> = ({ onTenantUpdate
             <div className="relative">
               <span className="absolute inset-y-0 left-0 pl-3 flex items-center text-xs font-bold text-slate-400">R$</span>
               <input
-                type="number"
-                step="0.10"
-                min="1"
+                type="text"
+                inputMode="decimal"
                 value={editPrices.module_3}
-                onChange={(e) => setEditPrices({ ...editPrices, module_3: parseFloat(e.target.value) || 0 })}
-                className="w-full pl-9 pr-3 py-2 bg-slate-900 border border-slate-700 rounded-lg text-sm font-bold text-white focus:outline-none focus:border-emerald-500"
+                onChange={(e) => setEditPrices({ ...editPrices, module_3: e.target.value })}
+                className="w-full pl-9 pr-3 py-2 bg-slate-900 border border-slate-700 rounded-lg text-sm font-bold text-white focus:outline-none focus:border-emerald-500 font-mono"
               />
             </div>
             <p className="text-[10px] text-slate-400">Escolha de 3 módulos integrados</p>
@@ -736,12 +747,11 @@ export const MasterAdminView: React.FC<MasterAdminViewProps> = ({ onTenantUpdate
             <div className="relative">
               <span className="absolute inset-y-0 left-0 pl-3 flex items-center text-xs font-bold text-slate-400">R$</span>
               <input
-                type="number"
-                step="0.10"
-                min="1"
+                type="text"
+                inputMode="decimal"
                 value={editPrices.module_4}
-                onChange={(e) => setEditPrices({ ...editPrices, module_4: parseFloat(e.target.value) || 0 })}
-                className="w-full pl-9 pr-3 py-2 bg-slate-900 border border-emerald-500/50 rounded-lg text-sm font-bold text-white focus:outline-none focus:border-emerald-500"
+                onChange={(e) => setEditPrices({ ...editPrices, module_4: e.target.value })}
+                className="w-full pl-9 pr-3 py-2 bg-slate-900 border border-emerald-500/50 rounded-lg text-sm font-bold text-white focus:outline-none focus:border-emerald-500 font-mono"
               />
             </div>
             <p className="text-[10px] text-slate-400">Acesso total aos 4 sistemas</p>

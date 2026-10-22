@@ -666,10 +666,58 @@ class DataStore {
 
   // Preços dos Planos Globais do Sistema
   public getGlobalPlanPrices(): GlobalPlanPrices {
+    const diskPlans = this.loadObjectFile<GlobalPlanPrices>(FILE_GLOBAL_PLANS);
+    if (diskPlans) {
+      this.globalPlanPrices = {
+        module_1: Number(diskPlans.module_1) || DEFAULT_PLAN_PRICES.module_1,
+        module_2: Number(diskPlans.module_2) || DEFAULT_PLAN_PRICES.module_2,
+        module_3: Number(diskPlans.module_3) || DEFAULT_PLAN_PRICES.module_3,
+        module_4: Number(diskPlans.module_4) || DEFAULT_PLAN_PRICES.module_4,
+      };
+    }
     return { ...this.globalPlanPrices };
   }
 
-  public updateGlobalPlanPrices(updates: Partial<GlobalPlanPrices>): GlobalPlanPrices {
+  public async getGlobalPlanPricesAsync(): Promise<GlobalPlanPrices> {
+    if (isSupabaseConfigured()) {
+      try {
+        const client = getSupabaseClient();
+        if (client) {
+          const { data, error } = await client
+            .from('system_settings')
+            .select('*')
+            .eq('key', 'global_plan_prices')
+            .maybeSingle();
+
+          if (!error && data && data.value) {
+            const val = data.value;
+            this.globalPlanPrices = {
+              module_1: Number(val.module_1) || DEFAULT_PLAN_PRICES.module_1,
+              module_2: Number(val.module_2) || DEFAULT_PLAN_PRICES.module_2,
+              module_3: Number(val.module_3) || DEFAULT_PLAN_PRICES.module_3,
+              module_4: Number(val.module_4) || DEFAULT_PLAN_PRICES.module_4,
+            };
+            this.saveFile(FILE_GLOBAL_PLANS, this.globalPlanPrices);
+          }
+        }
+      } catch (err) {
+        console.warn('[Store] Falha ao consultar global_plan_prices no Supabase:', err);
+      }
+    } else {
+      const diskPlans = this.loadObjectFile<GlobalPlanPrices>(FILE_GLOBAL_PLANS);
+      if (diskPlans) {
+        this.globalPlanPrices = {
+          module_1: Number(diskPlans.module_1) || DEFAULT_PLAN_PRICES.module_1,
+          module_2: Number(diskPlans.module_2) || DEFAULT_PLAN_PRICES.module_2,
+          module_3: Number(diskPlans.module_3) || DEFAULT_PLAN_PRICES.module_3,
+          module_4: Number(diskPlans.module_4) || DEFAULT_PLAN_PRICES.module_4,
+        };
+      }
+    }
+    return { ...this.globalPlanPrices };
+  }
+
+  public async updateGlobalPlanPrices(updates: Partial<GlobalPlanPrices>): Promise<GlobalPlanPrices> {
     const parsePrice = (val: any, fallback: number): number => {
       if (typeof val === 'number' && !isNaN(val) && val > 0) return Number(val.toFixed(2));
       if (typeof val === 'string') {
@@ -694,22 +742,27 @@ class DataStore {
       }
     }
 
+    this.saveFile(FILE_GLOBAL_PLANS, this.globalPlanPrices);
     this.persist();
 
-    // Sincroniza imediatamente com a tabela system_settings do Supabase
+    // Sincroniza imediatamente com a tabela system_settings do Supabase com await
     if (isSupabaseConfigured()) {
-      const client = getSupabaseClient();
-      if (client) {
-        (client.from('system_settings').upsert({
-          key: 'global_plan_prices',
-          value: this.globalPlanPrices,
-          updated_at: new Date().toISOString(),
-        }) as any).then(({ error }: any) => {
-          if (error) console.error('[Supabase] Erro ao sincronizar global_plan_prices:', error.message);
-          else console.log('[Supabase] global_plan_prices sincronizado com sucesso:', this.globalPlanPrices);
-        }).catch((err: any) => {
-          console.error('[Supabase] Exceção ao atualizar global_plan_prices:', err);
-        });
+      try {
+        const client = getSupabaseClient();
+        if (client) {
+          const { error } = await client.from('system_settings').upsert({
+            key: 'global_plan_prices',
+            value: this.globalPlanPrices,
+            updated_at: new Date().toISOString(),
+          }, { onConflict: 'key' });
+          if (error) {
+            console.error('[Supabase] Erro ao sincronizar global_plan_prices:', error.message);
+          } else {
+            console.log('[Supabase] ✅ global_plan_prices sincronizado com sucesso:', this.globalPlanPrices);
+          }
+        }
+      } catch (err: any) {
+        console.error('[Supabase] Exceção ao atualizar global_plan_prices:', err);
       }
     }
 
