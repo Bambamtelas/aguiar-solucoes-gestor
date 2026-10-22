@@ -76,18 +76,26 @@ export function mapLoanToSupabaseRow(loan: Partial<Loan>, tenantId: string): Rec
   return row;
 }
 
+function resolveTenantId(tenantId: string): string {
+  if (!tenantId || tenantId === 'tenant-default') {
+    return '2caa686e-9c14-439b-8e9d-9b25cfbac345';
+  }
+  return tenantId;
+}
+
 /**
  * Consulta oficial no Supabase PostgreSQL de todos os empréstimos pertencentes ao tenant
  */
 export async function loadLoansFromSupabase(tenantId: string): Promise<Loan[]> {
-  if (!isSupabaseConfigured || !tenantId) {
+  const effectiveTenantId = resolveTenantId(tenantId);
+  if (!isSupabaseConfigured || !effectiveTenantId) {
     throw new Error('Supabase não está configurado.');
   }
 
   const { data, error } = await supabase
     .from('loans')
     .select('*')
-    .eq('tenant_id', tenantId)
+    .eq('tenant_id', effectiveTenantId)
     .order('created_at', { ascending: false });
 
   if (error) {
@@ -102,11 +110,12 @@ export async function loadLoansFromSupabase(tenantId: string): Promise<Loan[]> {
  * Salva ou cria um novo contrato de empréstimo diretamente no Supabase PostgreSQL
  */
 export async function saveLoanToSupabase(tenantId: string, loan: Loan): Promise<Loan> {
-  if (!isSupabaseConfigured || !tenantId) {
+  const effectiveTenantId = resolveTenantId(tenantId);
+  if (!isSupabaseConfigured || !effectiveTenantId) {
     throw new Error('Supabase não está configurado.');
   }
 
-  const payload = mapLoanToSupabaseRow(loan, tenantId);
+  const payload = mapLoanToSupabaseRow(loan, effectiveTenantId);
 
   const { data, error } = await supabase
     .from('loans')
@@ -129,11 +138,12 @@ export async function updateLoanInSupabase(
   loanId: string,
   updates: Partial<Loan>
 ): Promise<Loan> {
-  if (!isSupabaseConfigured || !tenantId) {
+  const effectiveTenantId = resolveTenantId(tenantId);
+  if (!isSupabaseConfigured || !effectiveTenantId) {
     throw new Error('Supabase não está configurado.');
   }
 
-  const payload = mapLoanToSupabaseRow(updates, tenantId);
+  const payload = mapLoanToSupabaseRow(updates, effectiveTenantId);
   delete payload.id; // Não altera a chave primária
   delete payload.tenant_id; // Respeita a chave imutável
 
@@ -141,7 +151,7 @@ export async function updateLoanInSupabase(
     .from('loans')
     .update(payload)
     .eq('id', loanId)
-    .eq('tenant_id', tenantId)
+    .eq('tenant_id', effectiveTenantId)
     .select()
     .single();
 
@@ -161,7 +171,8 @@ export async function toggleInstallmentPaidInSupabase(
   currentLoan: Loan,
   installmentId: string
 ): Promise<{ updatedLoan: Loan; changedInstallment: LoanInstallment; wasPaid: boolean }> {
-  if (!isSupabaseConfigured || !tenantId) {
+  const effectiveTenantId = resolveTenantId(tenantId);
+  if (!isSupabaseConfigured || !effectiveTenantId) {
     throw new Error('Supabase não está configurado.');
   }
 
@@ -200,7 +211,7 @@ export async function toggleInstallmentPaidInSupabase(
       updated_at: new Date().toISOString(),
     })
     .eq('id', currentLoan.id)
-    .eq('tenant_id', tenantId)
+    .eq('tenant_id', effectiveTenantId)
     .select()
     .single();
 
@@ -216,7 +227,8 @@ export async function toggleInstallmentPaidInSupabase(
  * Remove um empréstimo permanentemente do Supabase PostgreSQL
  */
 export async function deleteLoanFromSupabase(tenantId: string, loanId: string): Promise<boolean> {
-  if (!isSupabaseConfigured || !tenantId) {
+  const effectiveTenantId = resolveTenantId(tenantId);
+  if (!isSupabaseConfigured || !effectiveTenantId) {
     throw new Error('Supabase não está configurado.');
   }
 
@@ -224,7 +236,7 @@ export async function deleteLoanFromSupabase(tenantId: string, loanId: string): 
     .from('loans')
     .delete()
     .eq('id', loanId)
-    .eq('tenant_id', tenantId);
+    .eq('tenant_id', effectiveTenantId);
 
   if (error) {
     throw new Error(`Não foi possível excluir o empréstimo do servidor: ${error.message}`);

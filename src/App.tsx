@@ -127,7 +127,10 @@ export default function App() {
   };
 
   // Carrega dados dos módulos para o tenant autenticado
-  const loadTenantData = useCallback(async (tenantId: string) => {
+  const loadTenantData = useCallback(async (rawTenantId: string) => {
+    const tenantId = (!rawTenantId || rawTenantId === 'tenant-default')
+      ? '2caa686e-9c14-439b-8e9d-9b25cfbac345'
+      : rawTenantId;
     try {
       const statsPromise = api.getStats(tenantId).catch(() => DEFAULT_STATS);
       const customersPromise = isSupabaseConfigured
@@ -183,7 +186,13 @@ export default function App() {
         const authData = await getCurrentSupabaseAuth();
         if (isMounted) {
           if (authData && authData.session && authData.user) {
-            setTenant(authData.tenant);
+            const userEmail = (authData.user.email || authData.profile?.email || '').toLowerCase().trim();
+            const isMaster = userEmail === 'rominhoaguiar2134@gmail.com';
+            const effTenant = (isMaster || authData.tenant?.id === 'tenant-default')
+              ? { ...authData.tenant, id: '2caa686e-9c14-439b-8e9d-9b25cfbac345' }
+              : authData.tenant;
+
+            setTenant(effTenant);
             setProfile(authData.profile);
             setCurrentEmail(authData.user.email || authData.profile.email);
             setIsAuthenticated(true);
@@ -192,24 +201,24 @@ export default function App() {
 
             // Carregamento instantâneo do cache local enquanto consulta oficial ao Supabase é realizada
             try {
-              const cachedCusts = localStorage.getItem(`customers_${authData.tenant.id}`);
+              const cachedCusts = localStorage.getItem(`customers_${effTenant.id}`);
               if (cachedCusts) {
                 const parsed = JSON.parse(cachedCusts);
                 if (Array.isArray(parsed) && parsed.length > 0) setCustomers(parsed);
               }
-              const cachedCharges = localStorage.getItem(`charges_${authData.tenant.id}`);
+              const cachedCharges = localStorage.getItem(`charges_${effTenant.id}`);
               if (cachedCharges) {
                 const parsed = JSON.parse(cachedCharges);
                 if (Array.isArray(parsed) && parsed.length > 0) setCharges(parsed);
               }
-              const cachedProducts = localStorage.getItem(`products_${authData.tenant.id}`);
+              const cachedProducts = localStorage.getItem(`products_${effTenant.id}`);
               if (cachedProducts) {
                 const parsed = JSON.parse(cachedProducts);
                 if (Array.isArray(parsed) && parsed.length > 0) setProducts(parsed);
               }
             } catch {}
 
-            await loadTenantData(authData.tenant.id);
+            await loadTenantData(effTenant.id);
           } else {
             setIsAuthenticated(false);
             setTenant(null);
@@ -727,18 +736,29 @@ export default function App() {
     localStorage.setItem('multigestor_active_email', email);
     localStorage.setItem('multigestor_session_active', 'true');
 
+    const cleanEmail = email.toLowerCase().trim();
+    const isMaster = cleanEmail === 'rominhoaguiar2134@gmail.com';
+
     if (newTenant && newProfile) {
-      setTenant(newTenant);
+      const effTenant = (isMaster || newTenant.id === 'tenant-default')
+        ? { ...newTenant, id: '2caa686e-9c14-439b-8e9d-9b25cfbac345' }
+        : newTenant;
+
+      setTenant(effTenant);
       setProfile(newProfile);
       setIsAuthenticated(true);
-      await loadTenantData(newTenant.id);
+      await loadTenantData(effTenant.id);
     } else {
       const authData = await getCurrentSupabaseAuth();
       if (authData) {
-        setTenant(authData.tenant);
+        const effTenant = (isMaster || authData.tenant?.id === 'tenant-default')
+          ? { ...authData.tenant, id: '2caa686e-9c14-439b-8e9d-9b25cfbac345' }
+          : authData.tenant;
+
+        setTenant(effTenant);
         setProfile(authData.profile);
         setIsAuthenticated(true);
-        await loadTenantData(authData.tenant.id);
+        await loadTenantData(effTenant.id);
       }
     }
   };

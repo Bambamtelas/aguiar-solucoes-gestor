@@ -1745,7 +1745,10 @@ export function createApiApp(): Express {
 
   // 17. MÓDULO EMPRÉSTIMOS & COBRANÇAS PARCELADAS (ESPAÇO DEDICADO)
   app.get('/api/loans', async (req: Request, res: Response) => {
-    const tenantId = (req.query.tenantId as string) || 'tenant-default';
+    let tenantId = (req.query.tenantId as string) || 'tenant-default';
+    if (tenantId === 'tenant-default') {
+      tenantId = '2caa686e-9c14-439b-8e9d-9b25cfbac345';
+    }
     const loans = await store.getLoansAsync(tenantId);
     res.json(loans);
   });

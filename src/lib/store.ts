@@ -464,31 +464,6 @@ class DataStore {
     const now = new Date();
     const twoDaysLater = new Date(now.getTime() + 2 * 24 * 60 * 60 * 1000);
 
-    // Default Demo Tenant
-    const defaultTenant: Tenant = {
-      id: 'tenant-default',
-      name: 'Aguiar Soluções Gestor',
-      trade_name: 'Aguiar Soluções Gestor',
-      phone: '27988182776',
-      whatsapp: '27988182776',
-      email: 'rominhoaguiar2134@gmail.com',
-      address_street: 'Centro',
-      address_number: '100',
-      address_neighborhood: 'Centro',
-      address_city: 'Vitória',
-      address_state: 'ES',
-      address_zip: '29000-000',
-      pix_key: 'rominhoaguiar2134@gmail.com',
-      pix_key_type: 'email',
-      logo_url: '/multigestor.png',
-      subscription_status: 'lifetime',
-      trial_started_at: now.toISOString(),
-      trial_ends_at: '2099-12-31T23:59:59.000Z',
-      subscription_expires_at: '2099-12-31T23:59:59.000Z',
-      created_at: now.toISOString(),
-      updated_at: now.toISOString(),
-    };
-
     // Master Admin Tenant (Oficial: Aguiar Soluções Gestor)
     const adminTenant: Tenant = {
       id: '2caa686e-9c14-439b-8e9d-9b25cfbac345',
@@ -510,7 +485,7 @@ class DataStore {
       owner_user_id: 'user-master-aguiar',
     };
 
-    this.tenants = [defaultTenant, adminTenant];
+    this.tenants = [adminTenant];
 
     // Default Profiles
     this.profiles = [
@@ -962,20 +937,39 @@ class DataStore {
     const diskPasswords = this.loadObjectFile<Record<string, string>>(FILE_USER_PASSWORDS);
     if (diskPasswords) this.userPasswords = diskPasswords;
 
+    const isMasterAdmin = cleanEmail === 'rominhoaguiar2134@gmail.com';
+
     const profile = this.profiles.find((p) => p.email && p.email.toLowerCase() === cleanEmail);
-    const tenant = this.tenants.find((t) => t.email && t.email.toLowerCase() === cleanEmail);
+    
+    // Prioridade 1: se for o Administrador Master, o tenant oficial é SEMPRE '2caa686e-9c14-439b-8e9d-9b25cfbac345'
+    let tenant: Tenant | null = null;
+    if (isMasterAdmin) {
+      tenant = this.tenants.find((t) => t.id === '2caa686e-9c14-439b-8e9d-9b25cfbac345') || null;
+    }
+
+    // Prioridade 2: busca pelo tenant_id vinculado no perfil
+    if (!tenant && profile?.tenant_id) {
+      tenant = this.tenants.find((t) => t.id === profile.tenant_id) || null;
+    }
+
+    // Prioridade 3: busca por e-mail ignorando tenant-default
+    if (!tenant) {
+      tenant = this.tenants.find((t) => t.email && t.email.toLowerCase() === cleanEmail && t.id !== 'tenant-default') || null;
+    }
+    if (!tenant) {
+      tenant = this.tenants.find((t) => t.email && t.email.toLowerCase() === cleanEmail) || null;
+    }
 
     if (!profile && !tenant) {
       return null;
     }
 
-    const isMasterAdmin = cleanEmail === 'rominhoaguiar2134@gmail.com';
-
     const resolvedProfile = profile || {
-      id: `user-${Date.now()}`,
+      id: isMasterAdmin ? 'user-master-aguiar' : `user-${Date.now()}`,
       email: cleanEmail,
       full_name: tenant?.name || cleanEmail.split('@')[0],
       role: isMasterAdmin ? 'master_admin' : 'owner',
+      tenant_id: isMasterAdmin ? '2caa686e-9c14-439b-8e9d-9b25cfbac345' : (tenant?.id || `tenant-${Date.now()}`),
       created_at: new Date().toISOString(),
       updated_at: new Date().toISOString(),
     };
@@ -984,13 +978,13 @@ class DataStore {
     if (!resolvedTenant) {
       const now = new Date();
       resolvedTenant = {
-        id: `tenant-${Date.now()}`,
-        name: `Empresa de ${resolvedProfile.full_name}`,
+        id: isMasterAdmin ? '2caa686e-9c14-439b-8e9d-9b25cfbac345' : `tenant-${Date.now()}`,
+        name: isMasterAdmin ? 'Aguiar Soluções Gestor' : `Empresa de ${resolvedProfile.full_name}`,
         email: cleanEmail,
-        subscription_status: 'trial',
+        subscription_status: isMasterAdmin ? 'lifetime' : 'trial',
         trial_started_at: now.toISOString(),
-        trial_ends_at: new Date(now.getTime() + 2 * 86400000).toISOString(),
-        subscription_expires_at: new Date(now.getTime() + 2 * 86400000).toISOString(),
+        trial_ends_at: isMasterAdmin ? '2099-12-31T23:59:59.000Z' : new Date(now.getTime() + 2 * 86400000).toISOString(),
+        subscription_expires_at: isMasterAdmin ? '2099-12-31T23:59:59.000Z' : new Date(now.getTime() + 2 * 86400000).toISOString(),
         created_at: now.toISOString(),
         updated_at: now.toISOString(),
       };
@@ -1006,11 +1000,33 @@ class DataStore {
     if (!email || !email.trim()) return null;
     const cleanEmail = email.trim().toLowerCase();
 
-    // 1. Procura na memória local
+    // 1. Prioridade absoluta para Administrador Master
+    if (cleanEmail === 'rominhoaguiar2134@gmail.com') {
+      let masterTenant = this.tenants.find((t) => t.id === '2caa686e-9c14-439b-8e9d-9b25cfbac345');
+      let masterProfile = this.profiles.find((p) => p.email && p.email.toLowerCase() === cleanEmail);
+      if (!masterTenant || !masterProfile) {
+        if (isSupabaseConfigured()) {
+          try {
+            const client = getSupabaseClient();
+            if (client) {
+              const { data: tData } = await client.from('tenants').select('*').eq('id', '2caa686e-9c14-439b-8e9d-9b25cfbac345').maybeSingle();
+              if (tData) masterTenant = tData as Tenant;
+              const { data: pData } = await client.from('profiles').select('*').eq('email', cleanEmail).maybeSingle();
+              if (pData) masterProfile = pData as Profile;
+            }
+          } catch {}
+        }
+      }
+      if (masterTenant && masterProfile) {
+        return { profile: masterProfile, tenant: this.checkAndUpdateTenantStatus(masterTenant)! };
+      }
+    }
+
+    // 2. Procura na memória local
     const local = this.findAccount(cleanEmail);
     if (local) return local;
 
-    // 2. Se não encontrou na memória, busca no Supabase
+    // 3. Se não encontrou na memória, busca no Supabase
     if (isSupabaseConfigured()) {
       try {
         const client = getSupabaseClient();

@@ -82,13 +82,16 @@ interface LoansViewProps {
 }
 
 export const LoansView: React.FC<LoansViewProps> = ({ tenant }) => {
-  const tenantId = tenant.id || 'tenant-default';
+  const isMaster = tenant?.email?.toLowerCase().trim() === 'rominhoaguiar2134@gmail.com';
+  const tenantId = (isMaster || !tenant?.id || tenant.id === 'tenant-default')
+    ? '2caa686e-9c14-439b-8e9d-9b25cfbac345'
+    : tenant.id;
   const storageKey = `loans_${tenantId}`;
 
   // Estado em memória (cache/interface) inicializado com cache do localStorage para carregamento instantâneo
   const [loans, setLoans] = useState<Loan[]>(() => {
     try {
-      const saved = localStorage.getItem(storageKey);
+      const saved = localStorage.getItem(storageKey) || localStorage.getItem('loans_2caa686e-9c14-439b-8e9d-9b25cfbac345') || localStorage.getItem('loans_tenant-default');
       if (saved) {
         const parsed = JSON.parse(saved);
         if (Array.isArray(parsed) && parsed.length > 0) {
