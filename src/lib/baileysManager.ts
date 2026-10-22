@@ -1,5 +1,6 @@
 import path from 'path';
 import fs from 'fs';
+import os from 'os';
 import QRCode from 'qrcode';
 import pino from 'pino';
 
@@ -68,9 +69,43 @@ const logger = pino({ level: 'silent' });
 const fileSyncedMtimes = new Map<string, number>();
 const syncDebounceTimers = new Map<string, NodeJS.Timeout>();
 
+export function getBaseSessionsDir(): string {
+  const isServerless = Boolean(
+    process.env.VERCEL ||
+    process.env.AWS_LAMBDA_FUNCTION_NAME ||
+    process.env.LAMBDA_TASK_ROOT
+  );
+
+  if (isServerless) {
+    const tmpBase = path.join(os.tmpdir(), 'whatsapp_sessions');
+    if (!fs.existsSync(tmpBase)) {
+      try {
+        fs.mkdirSync(tmpBase, { recursive: true });
+      } catch {}
+    }
+    return tmpBase;
+  }
+
+  const localBase = path.join(process.cwd(), 'data', 'whatsapp_sessions');
+  try {
+    if (!fs.existsSync(localBase)) {
+      fs.mkdirSync(localBase, { recursive: true });
+    }
+    return localBase;
+  } catch {
+    const tmpFallback = path.join(os.tmpdir(), 'whatsapp_sessions');
+    if (!fs.existsSync(tmpFallback)) {
+      try {
+        fs.mkdirSync(tmpFallback, { recursive: true });
+      } catch {}
+    }
+    return tmpFallback;
+  }
+}
+
 function getSessionPath(instanceName: string) {
   const safeName = instanceName.replace(/[^a-zA-Z0-9_-]/g, '_');
-  const dir = path.join(process.cwd(), 'data', 'whatsapp_sessions', safeName);
+  const dir = path.join(getBaseSessionsDir(), safeName);
   if (!fs.existsSync(dir)) {
     fs.mkdirSync(dir, { recursive: true });
   }
@@ -501,7 +536,7 @@ export async function getOrInitBaileysInstance(
 }
 
 export function getAvailableSessionDirs(): string[] {
-  const base = path.join(process.cwd(), 'data', 'whatsapp_sessions');
+  const base = getBaseSessionsDir();
   if (!fs.existsSync(base)) return [];
   try {
     return fs.readdirSync(base).filter((d) => {
@@ -934,7 +969,7 @@ export async function purgeAllWhatsAppInstances(): Promise<{
   instancesMap.clear();
 
   // 4. Remove todos os diretórios locais de sessões
-  const baseSessionsDir = path.join(process.cwd(), 'data', 'whatsapp_sessions');
+  const baseSessionsDir = getBaseSessionsDir();
   if (fs.existsSync(baseSessionsDir)) {
     try {
       const items = fs.readdirSync(baseSessionsDir);

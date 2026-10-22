@@ -32,8 +32,43 @@ import { getSupabaseClient, isSupabaseConfigured, testSupabaseConnection, SUPABA
 import { disconnectBaileysInstance } from './baileysManager.js';
 import fs from 'fs';
 import path from 'path';
+import os from 'os';
 
-const DATA_DIR = path.resolve(process.cwd(), 'data');
+function resolveDataDir(): string {
+  const isServerless = Boolean(
+    process.env.VERCEL ||
+    process.env.AWS_LAMBDA_FUNCTION_NAME ||
+    process.env.LAMBDA_TASK_ROOT
+  );
+
+  if (isServerless) {
+    const tmpData = path.join(os.tmpdir(), 'aguiar_gestor_data');
+    if (!fs.existsSync(tmpData)) {
+      try {
+        fs.mkdirSync(tmpData, { recursive: true });
+      } catch {}
+    }
+    return tmpData;
+  }
+
+  const localData = path.resolve(process.cwd(), 'data');
+  try {
+    if (!fs.existsSync(localData)) {
+      fs.mkdirSync(localData, { recursive: true });
+    }
+    return localData;
+  } catch {
+    const tmpData = path.join(os.tmpdir(), 'aguiar_gestor_data');
+    if (!fs.existsSync(tmpData)) {
+      try {
+        fs.mkdirSync(tmpData, { recursive: true });
+      } catch {}
+    }
+    return tmpData;
+  }
+}
+
+const DATA_DIR = resolveDataDir();
 const DATA_FILE = path.join(DATA_DIR, 'database.json');
 
 // Arquivos de persistência isolados e dedicados por Módulo e Entidade
@@ -191,7 +226,9 @@ class DataStore {
   public persist() {
     try {
       if (!fs.existsSync(DATA_DIR)) {
-        fs.mkdirSync(DATA_DIR, { recursive: true });
+        try {
+          fs.mkdirSync(DATA_DIR, { recursive: true });
+        } catch {}
       }
 
       // 1. Grava no Módulo IPTV separadamente
