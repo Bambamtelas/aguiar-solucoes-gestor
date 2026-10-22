@@ -1146,17 +1146,22 @@ export function createApiApp(): Express {
   // 9.4.1 Criar Nova Instância Diretamente na Evolution API
   app.post('/api/whatsapp/instance/create', async (req: Request, res: Response) => {
     try {
-      const { server_url, api_key, instance_name } = req.body;
+      const { server_url, api_key, instance_name, forceRestart } = req.body;
       const result = await createEvolutionInstance({
         server_url,
         api_key,
-        instance_name,
+        instance_name: instance_name || 'instancia_aguiar_gestor',
+        forceRestart: Boolean(forceRestart),
       });
 
       // Se a criação não retornou QR Code imediato ou já existia, busca via fetchEvolutionQRCode
       if (!result.base64 && !result.code) {
         try {
-          const qr = await fetchEvolutionQRCode({ server_url, api_key, instance_name });
+          const qr = await fetchEvolutionQRCode({
+            server_url,
+            api_key,
+            instance_name: instance_name || 'instancia_aguiar_gestor',
+          });
           return res.json({ ...result, ...qr });
         } catch {}
       }
@@ -1172,7 +1177,7 @@ export function createApiApp(): Express {
     try {
       const { instance_name, phoneNumber, phone } = req.body;
       const targetPhone = phoneNumber || phone;
-      const targetInstance = instance_name || 'instancia_ativacoes_e_vendas';
+      const targetInstance = instance_name || 'instancia_aguiar_gestor';
       const result = await requestBaileysPairingCode({
         instanceName: targetInstance,
         phoneNumber: targetPhone,

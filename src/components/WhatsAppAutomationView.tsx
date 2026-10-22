@@ -476,33 +476,11 @@ export const WhatsAppAutomationView: React.FC<WhatsAppAutomationViewProps> = ({ 
 
       const requestRealQR = async () => {
         try {
-          // 1. Tenta criar/conectar na instância
-          const res = await api.createWhatsAppInstance({
-            server_url: config.server_url,
-            api_key: config.api_key,
-            instance_name: config.instance_name,
-          });
-
-          if (res?.base64) {
-            setQrCodeDataUrl(res.base64.startsWith('data:') ? res.base64 : `data:image/png;base64,${res.base64}`);
-            setPairingStatusInfo('Aponte a câmera do WhatsApp para escanear');
-            return;
-          } else if (res?.code) {
-            const url = await QRCode.toDataURL(res.code, {
-              margin: 3,
-              scale: 8,
-              color: { dark: '#000000', light: '#ffffff' },
-            });
-            setQrCodeDataUrl(url);
-            setPairingStatusInfo('Aponte a câmera do WhatsApp para escanear');
-            return;
-          }
-
-          // Fallback para connect se create não retornou imediato
+          setPairingStatusInfo('Solicitando QR Code oficial ao WhatsApp...');
           const connRes = await api.connectWhatsAppInstance({
             server_url: config.server_url,
             api_key: config.api_key,
-            instance_name: config.instance_name,
+            instance_name: config.instance_name || 'instancia_aguiar_gestor',
           });
 
           if (connRes?.base64) {
@@ -516,8 +494,13 @@ export const WhatsAppAutomationView: React.FC<WhatsAppAutomationViewProps> = ({ 
             });
             setQrCodeDataUrl(url);
             setPairingStatusInfo('Aponte a câmera do WhatsApp para escanear');
+          } else if (connRes?.connected) {
+            const connectedPhone = connRes.ownerPhone || tenant.whatsapp || config.connected_phone;
+            setConnecting(false);
+            setQrCodeDataUrl(null);
+            setConnectionSuccessAlert(`🎉 WhatsApp já está conectado! (${connectedPhone || 'Ativo'})`);
           } else {
-            setPairingStatusInfo('Aguardando resposta do WhatsApp... Se demorar, clique em "Regerar QR Code".');
+            setPairingStatusInfo('Gerando QR Code... Aguarde alguns instantes.');
           }
         } catch (err: any) {
           console.error('[WhatsApp Pairing Error]', err);
@@ -527,13 +510,13 @@ export const WhatsAppAutomationView: React.FC<WhatsAppAutomationViewProps> = ({ 
 
       requestRealQR();
 
-      // 2. Auto-polling: detecta em tempo real quando o usuário escaneia no celular
+      // 2. Auto-polling: detecta em tempo real quando o usuário escaneia no celular e atualiza QR expirado
       statusPoller = setInterval(async () => {
         try {
           const res = await api.getWhatsAppInstanceStatus({
             server_url: config.server_url,
             api_key: config.api_key,
-            instance_name: config.instance_name,
+            instance_name: config.instance_name || 'instancia_aguiar_gestor',
           });
 
           if (res?.connected) {
@@ -558,6 +541,20 @@ export const WhatsAppAutomationView: React.FC<WhatsAppAutomationViewProps> = ({ 
             setQrCodeDataUrl(null);
             setConnectionSuccessAlert(`🎉 WhatsApp conectado com sucesso à instância "${actualInst}"! O número ${connectedPhone} está ativo para disparos automáticos.`);
             setTimeout(() => setConnectionSuccessAlert(null), 8000);
+          } else if ((res as any)?.qrCode) {
+            // RENOVAÇÃO AUTOMÁTICA DO QR CODE SE O BAILEYS GEROU NOVO TOKEN VÁLIDO
+            const incomingQr = (res as any).qrCode;
+            const formattedQr = incomingQr.startsWith('data:') ? incomingQr : `data:image/png;base64,${incomingQr}`;
+            setQrCodeDataUrl((prev) => {
+              if (prev !== formattedQr) {
+                console.log('[WhatsApp Poller] QR Code atualizado em tempo real pelo servidor.');
+                return formattedQr;
+              }
+              return prev;
+            });
+            setPairingStatusInfo('Aponte a câmera do WhatsApp para escanear (QR renovado)');
+          } else if ((res as any)?.isReconnecting) {
+            setPairingStatusInfo('Conectando ao WhatsApp... Autenticando com seu aparelho.');
           }
         } catch {}
       }, 2000);
@@ -645,7 +642,7 @@ export const WhatsAppAutomationView: React.FC<WhatsAppAutomationViewProps> = ({ 
         .replace(/[^a-z0-9]/g, '_')
         .slice(0, 15);
       const newInstName = isMasterAdmin
-        ? 'instancia_ativacoes_e_vendas'
+        ? 'instancia_aguiar_gestor'
         : `inst_${slug}_${cleanTenantId}_${Math.random().toString(36).substring(2, 6)}`;
       setConfig((prev) => ({
         ...prev,
@@ -664,8 +661,9 @@ export const WhatsAppAutomationView: React.FC<WhatsAppAutomationViewProps> = ({ 
     api.createWhatsAppInstance({
       server_url: config.server_url,
       api_key: config.api_key,
-      instance_name: config.instance_name,
-    })
+      instance_name: config.instance_name || 'instancia_aguiar_gestor',
+      forceRestart: true,
+    } as any)
       .then((res) => {
         if (res?.base64) {
           setQrCodeDataUrl(res.base64.startsWith('data:') ? res.base64 : `data:image/png;base64,${res.base64}`);
@@ -700,7 +698,7 @@ export const WhatsAppAutomationView: React.FC<WhatsAppAutomationViewProps> = ({ 
     setPairingStatusInfo('Solicitando código de emparelhamento de 8 dígitos ao WhatsApp...');
     try {
       const res = await api.requestWhatsAppPairingCode({
-        instance_name: config.instance_name || 'instancia_ativacoes_e_vendas',
+        instance_name: config.instance_name || 'instancia_aguiar_gestor',
         phoneNumber: raw,
       });
       if (res.success && res.code) {
@@ -1484,6 +1482,14 @@ export const WhatsAppAutomationView: React.FC<WhatsAppAutomationViewProps> = ({ 
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6 items-center">
               {/* QR Code view */}
               <div className="flex flex-col items-center justify-center p-4 bg-slate-950 rounded-2xl border border-slate-800">
+                <div className="flex items-center gap-2 text-[11px] font-bold text-emerald-400 mb-2">
+                  <span className="relative flex h-2 w-2">
+                    <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
+                    <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-500"></span>
+                  </span>
+                  <span>QR Code Oficial (Renovação Automática)</span>
+                </div>
+
                 {qrCodeDataUrl ? (
                   <div className="p-3 bg-white rounded-2xl shadow-2xl">
                     <img src={qrCodeDataUrl} alt="WhatsApp QR Code" className="w-56 h-56 object-contain" />
@@ -1494,8 +1500,23 @@ export const WhatsAppAutomationView: React.FC<WhatsAppAutomationViewProps> = ({ 
                     <span className="text-xs">Gerando QR Code...</span>
                   </div>
                 )}
-                <div className="text-[11px] text-slate-400 mt-3 text-center">
+                <div className="text-[11px] text-slate-400 mt-2 text-center">
                   Aponte a câmera do WhatsApp para este código
+                </div>
+
+                {/* Quick alternative button */}
+                <div className="mt-3 w-full p-2.5 bg-slate-900/90 border border-emerald-500/30 rounded-xl text-center">
+                  <span className="text-[11px] text-slate-300 block">
+                    Demorando para ler com a câmera?
+                  </span>
+                  <button
+                    type="button"
+                    onClick={() => setPairingMode('pairing_code')}
+                    className="mt-1 text-xs text-emerald-400 hover:text-emerald-300 font-bold underline cursor-pointer inline-flex items-center gap-1"
+                  >
+                    <Smartphone className="w-3.5 h-3.5" />
+                    <span>Conectar com Código de 8 Dígitos (Sem Câmera)</span>
+                  </button>
                 </div>
               </div>
 

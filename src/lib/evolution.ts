@@ -287,15 +287,16 @@ export async function sendDirectWhatsAppTextMessage({
   };
 }
 
-// Criar nova instância
 export async function createEvolutionInstance({
   server_url,
   api_key,
   instance_name,
+  forceRestart = false,
 }: {
   server_url?: string;
   api_key?: string;
   instance_name: string;
+  forceRestart?: boolean;
 }) {
   // Se for externa, tenta criar no servidor externo
   if (isExternalEvolutionUrl(server_url) && api_key) {
@@ -333,8 +334,8 @@ export async function createEvolutionInstance({
     }
   }
 
-  // Engine Baileys Nativo: inicializa sessão limpa
-  const session = await getOrInitBaileysInstance(instance_name, { forceRestart: true });
+  // Engine Baileys Nativo: reutiliza sessão ou inicializa limpa se explicitamente solicitado
+  const session = await getOrInitBaileysInstance(instance_name, { forceRestart });
   return {
     success: true,
     created: true,

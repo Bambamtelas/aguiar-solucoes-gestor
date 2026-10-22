@@ -397,7 +397,7 @@ export async function getOrInitBaileysInstance(
         logger,
         printQRInTerminal: false,
         auth: state,
-        browser: Browsers.ubuntu('Chrome'),
+        browser: Browsers.macOS('Desktop'),
         connectTimeoutMs: 60000,
         defaultQueryTimeoutMs: 60000,
         keepAliveIntervalMs: 25000,
@@ -410,6 +410,14 @@ export async function getOrInitBaileysInstance(
       sock.ev.on('creds.update', async () => {
         try {
           await saveCreds();
+          if (state.creds?.me?.id) {
+            const rawId = state.creds.me.id;
+            const digits = rawId.split(':')[0].split('@')[0].replace(/\D/g, '');
+            if (digits) {
+              sessionData.ownerPhone = `+${digits}`;
+              sessionData.ownerName = state.creds.me.name || sessionData.ownerName;
+            }
+          }
           triggerDebouncedSessionSync(instanceName);
         } catch (e) {
           console.error('[Baileys] Error saving creds:', e);
@@ -427,9 +435,9 @@ export async function getOrInitBaileysInstance(
 
           try {
             const dataUrl = await QRCode.toDataURL(qr, {
-              margin: 2,
-              scale: 7,
-              color: { dark: '#0f172a', light: '#ffffff' },
+              margin: 3,
+              scale: 8,
+              color: { dark: '#000000', light: '#ffffff' },
             });
             sessionData.qrCodeDataUrl = dataUrl;
           } catch (e) {
