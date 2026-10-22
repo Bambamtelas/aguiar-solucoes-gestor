@@ -464,6 +464,94 @@ export const WhatsAppAutomationView: React.FC<WhatsAppAutomationViewProps> = ({ 
     loadLogs();
   }, [tenant.id]);
 
+  // Monitoramento ativo e disparo pontual dos horários agendados
+  useEffect(() => {
+    if (!config.auto_send_enabled) return;
+
+    const checkAndDispatchSchedule = async () => {
+      try {
+        const now = new Date();
+        const brTime = new Intl.DateTimeFormat('pt-BR', {
+          timeZone: 'America/Sao_Paulo',
+          hour: '2-digit',
+          minute: '2-digit',
+          hour12: false,
+        }).format(now);
+
+        const todayIso = new Intl.DateTimeFormat('sv-SE', {
+          timeZone: 'America/Sao_Paulo',
+        }).format(now);
+
+        // Manhã
+        const isMorning = config.morning_schedule_enabled !== false;
+        const morningTime = config.morning_schedule_time || config.scheduled_time || '09:00';
+        const morningKey = `${todayIso}_MANHA_${morningTime}`;
+
+        // Tarde
+        const isAfternoon = Boolean(config.afternoon_schedule_enabled || config.second_scheduled_time_enabled);
+        const afternoonTime = config.afternoon_schedule_time || config.second_scheduled_time || '14:30';
+        const afternoonKey = `${todayIso}_TARDE_${afternoonTime}`;
+
+        // Noite
+        const isNight = Boolean(config.night_schedule_enabled);
+        const nightTime = config.night_schedule_time || '19:00';
+        const nightKey = `${todayIso}_NOITE_${nightTime}`;
+
+        const lastMorning = (config as any).last_run_morning || (config as any).last_run_schedule || '';
+        const lastAfternoon = (config as any).last_run_afternoon || (config as any).last_run_schedule_second || '';
+        const lastNight = (config as any).last_run_night || '';
+
+        let targetPeriod: 'morning' | 'afternoon' | 'night' | null = null;
+        let patchKey: any = null;
+
+        if (isMorning && brTime >= morningTime && lastMorning !== morningKey) {
+          targetPeriod = 'morning';
+          patchKey = { last_run_morning: morningKey, last_run_schedule: morningKey };
+        } else if (isAfternoon && brTime >= afternoonTime && lastAfternoon !== afternoonKey) {
+          targetPeriod = 'afternoon';
+          patchKey = { last_run_afternoon: afternoonKey, last_run_schedule_second: afternoonKey };
+        } else if (isNight && brTime >= nightTime && lastNight !== nightKey) {
+          targetPeriod = 'night';
+          patchKey = { last_run_night: nightKey };
+        }
+
+        if (targetPeriod && patchKey) {
+          console.log(`[Auto Scheduler Frontend] ⏰ Turno ${targetPeriod} atingido (${brTime}). Executando disparo automático...`);
+          const updated = { ...config, ...patchKey, last_run_at: new Date().toISOString() };
+          setConfig(updated);
+          localStorage.setItem(storageKey, JSON.stringify(updated));
+          await api.saveWhatsAppConfig(tenant.id, updated).catch(() => {});
+
+          const res = await api.runAutomatedDispatches(tenant.id, false, 'all', undefined, targetPeriod);
+          if (res?.dispatchedCount && res.dispatchedCount > 0) {
+            setConnectionSuccessAlert(`🚀 Disparo automático do turno ${targetPeriod === 'night' ? 'da Noite' : targetPeriod === 'morning' ? 'da Manhã' : 'da Tarde'} executado com sucesso: ${res.dispatchedCount} mensagem(ns) enviada(s)!`);
+            loadLogs();
+            loadPendingNotices();
+            setTimeout(() => setConnectionSuccessAlert(null), 8000);
+          }
+        }
+      } catch (err) {
+        console.warn('[Auto Scheduler Frontend Error]:', err);
+      }
+    };
+
+    const interval = setInterval(checkAndDispatchSchedule, 15000);
+    checkAndDispatchSchedule();
+    return () => clearInterval(interval);
+  }, [
+    config.auto_send_enabled,
+    config.morning_schedule_enabled,
+    config.morning_schedule_time,
+    config.afternoon_schedule_enabled,
+    config.afternoon_schedule_time,
+    config.night_schedule_enabled,
+    config.night_schedule_time,
+    (config as any).last_run_morning,
+    (config as any).last_run_afternoon,
+    (config as any).last_run_night,
+    tenant.id,
+  ]);
+
   // QR Code pairing logic & Real-time Auto-Detection
   useEffect(() => {
     let timer: any;

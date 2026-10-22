@@ -1832,7 +1832,6 @@ function startWhatsAppAutomationScheduler() {
       for (const tenantId of allTenantIds) {
         if (tenantId === 'tenant-default') continue;
         const tenant = store.getTenant(tenantId) || { id: tenantId, name: 'Empresa', email: '' };
-        if (tenant.email === 'rominhoaguiar2134@gmail.com') continue;
         const config = store.getWhatsAppConfig(tenantId);
         if (!config || !config.auto_send_enabled) continue;
 
