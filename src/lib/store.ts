@@ -2629,7 +2629,7 @@ class DataStore {
             installments: loan.installments || [],
             created_at: loan.createdAt || new Date().toISOString(),
             updated_at: new Date().toISOString(),
-          }).then(() => {}).catch(() => {});
+          } as any).then(() => {}, () => {});
         }
       } catch {}
     }
@@ -2667,7 +2667,7 @@ class DataStore {
           if (l.totalToReceive) row.total_to_receive = l.totalToReceive;
           if (l.installments) row.installments = l.installments;
 
-          client.from('loans').update(row).eq('id', id).then(() => {}).catch(() => {});
+          (client.from('loans').update(row).eq('id', id) as any).then(() => {}, () => {});
         }
       } catch {}
     }
@@ -2685,7 +2685,7 @@ class DataStore {
         try {
           const client = getSupabaseClient();
           if (client) {
-            client.from('loans').delete().eq('id', id).then(() => {}).catch(() => {});
+            (client.from('loans').delete().eq('id', id) as any).then(() => {}, () => {});
           }
         } catch {}
       }
@@ -3459,7 +3459,7 @@ class DataStore {
         const isOverdue =
           (s.status === 'overdue' || dueDate < todayStr) &&
           dueDate >= minOverdueDate &&
-          s.status !== 'paid' &&
+          (s.status as any) !== 'paid' &&
           s.status !== 'cancelled';
 
         if (isOverdue) {
@@ -3736,7 +3736,7 @@ class DataStore {
             const isInstOverdue =
               (inst.status === 'overdue' || instDueDate < todayStr) &&
               instDueDate >= minOverdueDate &&
-              inst.status !== 'paid';
+              (inst.status as any) !== 'paid';
 
             if (isInstOverdue) {
               pushNotice('overdue', {
@@ -3813,7 +3813,7 @@ class DataStore {
             (l.status === 'overdue' || dueDate < todayStr) &&
             dueDate >= minOverdueDate &&
             l.status !== 'completed' &&
-            l.status !== 'paid';
+            (l.status as any) !== 'paid';
 
           if (isLoanOverdue) {
             pushNotice('overdue', {

@@ -453,7 +453,15 @@ export const api = {
     server_url: string;
     api_key: string;
     instance_name: string;
-  }): Promise<{ base64?: string; code?: string; pairingCode?: string }> {
+  }): Promise<{
+    base64?: string;
+    code?: string;
+    pairingCode?: string;
+    connected?: boolean;
+    ownerPhone?: string;
+    status?: string;
+    message?: string;
+  }> {
     const res = await fetchWithRetry('/api/whatsapp/instance/connect', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -535,7 +543,8 @@ export const api = {
     tenantId: string,
     force = true,
     module?: 'loan' | 'iptv' | 'charge' | 'subscription' | 'all',
-    testPhone?: string
+    testPhone?: string,
+    period?: 'morning' | 'afternoon' | 'night' | 'all'
   ): Promise<{
     success: boolean;
     timestamp: string;
@@ -547,7 +556,7 @@ export const api = {
     const res = await fetchWithRetry('/api/automation/run', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ tenantId, force, module, testPhone }),
+      body: JSON.stringify({ tenantId, force, module, testPhone, period }),
     });
     return res.json();
   },

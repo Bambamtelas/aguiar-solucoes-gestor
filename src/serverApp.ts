@@ -1,4 +1,4 @@
-import express, { Request, Response, Express } from 'express';
+import express, { Request, Response, Express, NextFunction } from 'express';
 import compression from 'compression';
 import path from 'path';
 import { fileURLToPath } from 'url';
@@ -42,6 +42,12 @@ export function createApiApp(): Express {
 
   app.use(compression() as any);
   app.use(express.json());
+  app.use((err: any, _req: Request, res: Response, next: NextFunction) => {
+    if (err && err.status === 400 && 'body' in err) {
+      return res.status(400).json({ error: 'Payload JSON inválido' });
+    }
+    next(err);
+  });
   
   // Public assets
   const publicDir = path.resolve(__dirname, '../public');
@@ -1309,12 +1315,12 @@ export function createApiApp(): Express {
   // 9.8 Executar Disparos Automáticos Imediatamente (Botão Disparar Agora / Manual Run)
   app.post('/api/automation/run', async (req: Request, res: Response) => {
     try {
-      const { tenantId, force = true, module: targetModule, testPhone } = req.body;
+      const { tenantId, force = true, module: targetModule, testPhone, period } = req.body;
       const targetTenantId = tenantId || store.tenants[0]?.id;
       if (!targetTenantId) {
         return res.status(400).json({ error: 'tenantId is required' });
       }
-      const runResult = await store.runAutomatedDispatches(targetTenantId, force, targetModule, testPhone);
+      const runResult = await store.runAutomatedDispatches(targetTenantId, force, targetModule, testPhone, period);
       res.json(runResult);
     } catch (err: any) {
       console.error('Error running automated dispatches:', err);
