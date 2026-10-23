@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   Wallet,
   LayoutDashboard,
@@ -16,7 +16,8 @@ import {
   ChevronDown,
   UserCheck,
 } from 'lucide-react';
-import { Tenant, Profile, SubscriptionStatus, calculatePlanPrice } from '../types/index.js';
+import { Tenant, Profile, SubscriptionStatus, calculatePlanPrice, GlobalPlanPrices, DEFAULT_PLAN_PRICES } from '../types/index.js';
+import { api } from '../lib/api.js';
 
 export type NavigationTab =
   | 'dashboard'
@@ -55,6 +56,23 @@ export const Header: React.FC<HeaderProps> = ({
   onOpenSubscriptionModal,
   onSwitchUser,
 }) => {
+  const [globalPlanPrices, setGlobalPlanPrices] = useState<GlobalPlanPrices>(DEFAULT_PLAN_PRICES);
+
+  useEffect(() => {
+    let active = true;
+    api.getGlobalPlanPrices().then((p) => {
+      if (active && p) setGlobalPlanPrices(p);
+    });
+    const handleUpdate = (e: CustomEvent<GlobalPlanPrices>) => {
+      if (e.detail) setGlobalPlanPrices(e.detail);
+    };
+    window.addEventListener('global_plan_prices_updated' as any, handleUpdate);
+    return () => {
+      active = false;
+      window.removeEventListener('global_plan_prices_updated' as any, handleUpdate);
+    };
+  }, []);
+
   const isMasterAdminAccount = Boolean(
     profile.role === 'master_admin' ||
     profile.email?.toLowerCase().trim() === 'rominhoaguiar2134@gmail.com' ||
@@ -148,8 +166,8 @@ export const Header: React.FC<HeaderProps> = ({
               const currentPrice =
                 tenant.plan_monthly_price ||
                 (tenant.selected_modules && tenant.selected_modules.length > 0
-                  ? calculatePlanPrice(tenant.selected_modules.length)
-                  : 24.9);
+                  ? calculatePlanPrice(tenant.selected_modules.length, globalPlanPrices)
+                  : globalPlanPrices.module_1);
               return (
                 <button
                   onClick={onOpenSubscriptionModal}

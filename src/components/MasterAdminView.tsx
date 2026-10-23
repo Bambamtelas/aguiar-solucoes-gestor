@@ -204,7 +204,12 @@ export const MasterAdminView: React.FC<MasterAdminViewProps> = ({ onTenantUpdate
       setHealth(hData);
       if (pData) {
         setGlobalPrices(pData);
-        setEditPrices(pData);
+        setEditPrices({
+          module_1: pData.module_1 !== undefined ? String(pData.module_1) : '24.9',
+          module_2: pData.module_2 !== undefined ? String(pData.module_2) : '39.9',
+          module_3: pData.module_3 !== undefined ? String(pData.module_3) : '49.9',
+          module_4: pData.module_4 !== undefined ? String(pData.module_4) : '69.9',
+        });
       }
     } catch (err) {
       console.error('Failed to load admin data', err);
@@ -234,7 +239,12 @@ export const MasterAdminView: React.FC<MasterAdminViewProps> = ({ onTenantUpdate
       };
       const updated = await api.updateGlobalPlanPrices(payload);
       setGlobalPrices(updated);
-      setEditPrices(updated);
+      setEditPrices({
+        module_1: updated.module_1 !== undefined ? String(updated.module_1) : String(payload.module_1),
+        module_2: updated.module_2 !== undefined ? String(updated.module_2) : String(payload.module_2),
+        module_3: updated.module_3 !== undefined ? String(updated.module_3) : String(payload.module_3),
+        module_4: updated.module_4 !== undefined ? String(updated.module_4) : String(payload.module_4),
+      });
       setPriceSuccessMsg('Valores dos planos atualizados com sucesso no sistema!');
       await fetchAdminData();
       setTimeout(() => setPriceSuccessMsg(null), 4000);
@@ -333,6 +343,21 @@ export const MasterAdminView: React.FC<MasterAdminViewProps> = ({ onTenantUpdate
 
   useEffect(() => {
     fetchAdminData();
+
+    const handlePricesUpdated = (e: any) => {
+      if (e?.detail) {
+        setGlobalPrices(e.detail);
+        setEditPrices({
+          module_1: String(e.detail.module_1),
+          module_2: String(e.detail.module_2),
+          module_3: String(e.detail.module_3),
+          module_4: String(e.detail.module_4),
+        });
+      }
+    };
+
+    window.addEventListener('global_plan_prices_updated', handlePricesUpdated);
+    return () => window.removeEventListener('global_plan_prices_updated', handlePricesUpdated);
   }, []);
 
   const handleExtendSubscription = async (tenantId: string, days = 30) => {
@@ -613,22 +638,7 @@ export const MasterAdminView: React.FC<MasterAdminViewProps> = ({ onTenantUpdate
         </div>
       )}
 
-      {/* 2. Centro de Diagnóstico e Teste de Automação (4 Módulos) */}
-      {(() => {
-        const masterTenant =
-          tenants.find(
-            (t) =>
-              t.id === '2caa686e-9c14-439b-8e9d-9b25cfbac345' ||
-              t.email?.toLowerCase().includes('betao') ||
-              t.email?.toLowerCase().includes('jonjon')
-          ) || tenants[0];
-
-        return masterTenant ? (
-          <ModuleAutomationDiagnostic tenant={masterTenant} onRefreshParent={fetchAdminData} />
-        ) : null;
-      })()}
-
-      {/* 3. Painel de Configuração de Valores dos Planos (Admin Master) */}
+      {/* 2. Painel de Configuração de Valores dos Planos (Admin Master) - Início do Painel */}
       <div className="bg-slate-900 border border-slate-800 rounded-2xl p-5 shadow-sm space-y-4">
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-3 border-b border-slate-800">
           <div>
@@ -825,10 +835,11 @@ export const MasterAdminView: React.FC<MasterAdminViewProps> = ({ onTenantUpdate
                         </span>
                       ) : isActive ? (() => {
                         const tPrice =
-                          t.plan_monthly_price ||
-                          (t.selected_modules && t.selected_modules.length > 0
-                            ? calculatePlanPrice(t.selected_modules.length, globalPrices)
-                            : globalPrices.module_1);
+                          t.has_custom_price && t.plan_monthly_price && t.plan_monthly_price > 0
+                            ? t.plan_monthly_price
+                            : (t.selected_modules && t.selected_modules.length > 0
+                              ? calculatePlanPrice(t.selected_modules.length, globalPrices)
+                              : globalPrices.module_1);
                         return (
                           <div className="flex items-center gap-1.5 flex-wrap">
                             <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[11px] font-semibold bg-emerald-500/10 text-emerald-400 border border-emerald-500/30">
@@ -847,10 +858,11 @@ export const MasterAdminView: React.FC<MasterAdminViewProps> = ({ onTenantUpdate
                         );
                       })() : isTrial ? (() => {
                         const tPrice =
-                          t.plan_monthly_price ||
-                          (t.selected_modules && t.selected_modules.length > 0
-                            ? calculatePlanPrice(t.selected_modules.length, globalPrices)
-                            : globalPrices.module_1);
+                          t.has_custom_price && t.plan_monthly_price && t.plan_monthly_price > 0
+                            ? t.plan_monthly_price
+                            : (t.selected_modules && t.selected_modules.length > 0
+                              ? calculatePlanPrice(t.selected_modules.length, globalPrices)
+                              : globalPrices.module_1);
                         return (
                           <div className="flex items-center gap-1.5 flex-wrap">
                             <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[11px] font-semibold bg-amber-500/10 text-amber-300 border border-amber-500/30">
@@ -1040,6 +1052,21 @@ export const MasterAdminView: React.FC<MasterAdminViewProps> = ({ onTenantUpdate
           </table>
         </div>
       </div>
+
+      {/* 4. Centro de Diagnóstico e Teste de Automação de WhatsApp (4 Módulos) */}
+      {(() => {
+        const masterTenant =
+          tenants.find(
+            (t) =>
+              t.id === '2caa686e-9c14-439b-8e9d-9b25cfbac345' ||
+              t.email?.toLowerCase().includes('betao') ||
+              t.email?.toLowerCase().includes('jonjon')
+          ) || tenants[0];
+
+        return masterTenant ? (
+          <ModuleAutomationDiagnostic tenant={masterTenant} onRefreshParent={fetchAdminData} />
+        ) : null;
+      })()}
 
       {/* Modal: Remover Vitalício / Ajustar Assinatura */}
       {selectedTenantForRemoval && (

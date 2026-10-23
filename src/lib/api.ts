@@ -18,6 +18,7 @@ import {
   SupportWhatsAppConfig,
   DEFAULT_SUPPORT_WHATSAPP_CONFIG,
 } from '../types/index.js';
+import { supabase, isSupabaseConfigured } from './supabaseClient.js';
 
 /**
  * Wrapper resiliente para fetch com retentativas automáticas e backoff exponencial.
@@ -52,7 +53,7 @@ export const api = {
       const res = await fetch(`/api/plans/prices?_t=${Date.now()}`);
       if (res.ok) {
         const data = await res.json();
-        if (data && typeof data === 'object') {
+        if (data && typeof data === 'object' && (data.module_1 || data.module_2)) {
           try {
             localStorage.setItem('cached_global_plan_prices', JSON.stringify(data));
           } catch {}
@@ -62,6 +63,28 @@ export const api = {
     } catch (err) {
       console.warn('Erro ao carregar preços globais da API:', err);
     }
+
+    // Fallback: consulta direta ao Supabase via cliente
+    if (isSupabaseConfigured) {
+      try {
+        const { data } = await supabase
+          .from('system_settings')
+          .select('value')
+          .eq('key', 'global_plan_prices')
+          .maybeSingle();
+
+        if (data && data.value && typeof data.value === 'object') {
+          const spData = data.value as GlobalPlanPrices;
+          try {
+            localStorage.setItem('cached_global_plan_prices', JSON.stringify(spData));
+          } catch {}
+          return spData;
+        }
+      } catch (sbErr) {
+        console.warn('Erro ao carregar preços globais direto do Supabase:', sbErr);
+      }
+    }
+
     try {
       const cached = localStorage.getItem('cached_global_plan_prices');
       if (cached) return JSON.parse(cached);
@@ -75,15 +98,53 @@ export const api = {
   },
 
   async updateGlobalPlanPrices(prices: Partial<GlobalPlanPrices>): Promise<GlobalPlanPrices> {
-    const res = await fetch('/api/plans/prices', {
-      method: 'PUT',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(prices),
-    });
-    const data = await res.json();
+    let data: any = null;
+    try {
+      const res = await fetch('/api/plans/prices', {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(prices),
+      });
+      if (res.ok) {
+        data = await res.json();
+      }
+    } catch (err) {
+      console.warn('Erro ao atualizar preços globais via API:', err);
+    }
+
+    if (!data || typeof data !== 'object') {
+      data = {
+        module_1: Number(prices.module_1) || 24.9,
+        module_2: Number(prices.module_2) || 39.9,
+        module_3: Number(prices.module_3) || 49.9,
+        module_4: Number(prices.module_4) || 69.9,
+      };
+    }
+
     try {
       localStorage.setItem('cached_global_plan_prices', JSON.stringify(data));
     } catch {}
+
+    // Sincroniza também diretamente no Supabase para persistência garantida
+    if (isSupabaseConfigured) {
+      try {
+        await supabase.from('system_settings').upsert({
+          key: 'global_plan_prices',
+          value: data,
+          updated_at: new Date().toISOString(),
+        }, { onConflict: 'key' });
+      } catch (sbErr) {
+        console.warn('Erro ao sincronizar preços com Supabase:', sbErr);
+      }
+    }
+
+    // Notifica toda a aplicação instantaneamente
+    if (typeof window !== 'undefined') {
+      try {
+        window.dispatchEvent(new CustomEvent('global_plan_prices_updated', { detail: data }));
+      } catch {}
+    }
+
     return data;
   },
 

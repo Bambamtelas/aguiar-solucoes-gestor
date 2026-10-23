@@ -54,9 +54,25 @@ import { supabase } from './lib/supabaseClient.js';
 import { getCurrentSupabaseAuth, signOutWithSupabase } from './lib/supabaseAuth.js';
 
 import { api } from './lib/api.js';
-import { Tenant, Profile, Customer, Charge, Product, SystemStats, calculatePlanPrice } from './types/index.js';
+import { Tenant, Profile, Customer, Charge, Product, SystemStats, calculatePlanPrice, GlobalPlanPrices, DEFAULT_PLAN_PRICES } from './types/index.js';
 
 export default function App() {
+  const [globalPlanPrices, setGlobalPlanPrices] = useState<GlobalPlanPrices>(DEFAULT_PLAN_PRICES);
+
+  useEffect(() => {
+    let active = true;
+    api.getGlobalPlanPrices().then((p) => {
+      if (active && p) setGlobalPlanPrices(p);
+    });
+    const handleUpdate = (e: CustomEvent<GlobalPlanPrices>) => {
+      if (e.detail) setGlobalPlanPrices(e.detail);
+    };
+    window.addEventListener('global_plan_prices_updated' as any, handleUpdate);
+    return () => {
+      active = false;
+      window.removeEventListener('global_plan_prices_updated' as any, handleUpdate);
+    };
+  }, []);
   const [currentEmail, setCurrentEmail] = useState<string>(() => {
     return localStorage.getItem('multigestor_active_email') || '';
   });
@@ -664,8 +680,8 @@ export default function App() {
   const currentPlanPrice =
     tenant?.plan_monthly_price ||
     (tenant?.selected_modules && tenant.selected_modules.length > 0
-      ? calculatePlanPrice(tenant.selected_modules.length)
-      : 24.9);
+      ? calculatePlanPrice(tenant.selected_modules.length, globalPlanPrices)
+      : globalPlanPrices.module_1);
 
   // Exibe o pop-up inteligente 1 vez por sessão automaticamente quando estiver nos 3 dias finais
   useEffect(() => {

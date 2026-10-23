@@ -160,6 +160,10 @@ export async function signUpWithSupabase(params: {
       phone: cleanPhone || undefined,
       subscription_status: 'trial',
       selected_modules: params.modules,
+      plan_monthly_price: tenantRecord.plan_monthly_price,
+      trial_started_at: tenantRecord.trial_started_at,
+      trial_ends_at: tenantRecord.trial_ends_at,
+      subscription_expires_at: tenantRecord.subscription_expires_at,
     });
 
     if (tErr) {

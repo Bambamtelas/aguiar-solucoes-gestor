@@ -760,6 +760,17 @@ class DataStore {
           } else {
             console.log('[Supabase] ✅ global_plan_prices sincronizado com sucesso:', this.globalPlanPrices);
           }
+
+          // Atualiza também os tenants sem preço fixo customizado diretamente no Supabase
+          for (const t of this.tenants) {
+            if (!t.has_custom_price && t.plan_monthly_price) {
+              try {
+                await client.from('tenants').update({
+                  plan_monthly_price: t.plan_monthly_price,
+                }).eq('id', t.id);
+              } catch {}
+            }
+          }
         }
       } catch (err: any) {
         console.error('[Supabase] Exceção ao atualizar global_plan_prices:', err);

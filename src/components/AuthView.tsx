@@ -72,18 +72,38 @@ export const AuthView: React.FC<AuthViewProps> = ({ onLoginSuccess }) => {
   };
 
   useEffect(() => {
-    api.getGlobalPlanPrices()
-      .then((res) => {
-        if (res && typeof res === 'object') {
-          setPlanPrices({
-            module_1: Number(res.module_1) || DEFAULT_PLAN_PRICES.module_1,
-            module_2: Number(res.module_2) || DEFAULT_PLAN_PRICES.module_2,
-            module_3: Number(res.module_3) || DEFAULT_PLAN_PRICES.module_3,
-            module_4: Number(res.module_4) || DEFAULT_PLAN_PRICES.module_4,
-          });
-        }
-      })
-      .catch(() => {});
+    const loadPrices = () => {
+      api.getGlobalPlanPrices()
+        .then((res) => {
+          if (res && typeof res === 'object') {
+            setPlanPrices({
+              module_1: Number(res.module_1) || DEFAULT_PLAN_PRICES.module_1,
+              module_2: Number(res.module_2) || DEFAULT_PLAN_PRICES.module_2,
+              module_3: Number(res.module_3) || DEFAULT_PLAN_PRICES.module_3,
+              module_4: Number(res.module_4) || DEFAULT_PLAN_PRICES.module_4,
+            });
+          }
+        })
+        .catch(() => {});
+    };
+
+    loadPrices();
+
+    const handlePricesUpdated = (e: any) => {
+      if (e?.detail) {
+        setPlanPrices({
+          module_1: Number(e.detail.module_1) || DEFAULT_PLAN_PRICES.module_1,
+          module_2: Number(e.detail.module_2) || DEFAULT_PLAN_PRICES.module_2,
+          module_3: Number(e.detail.module_3) || DEFAULT_PLAN_PRICES.module_3,
+          module_4: Number(e.detail.module_4) || DEFAULT_PLAN_PRICES.module_4,
+        });
+      } else {
+        loadPrices();
+      }
+    };
+
+    window.addEventListener('global_plan_prices_updated', handlePricesUpdated);
+    return () => window.removeEventListener('global_plan_prices_updated', handlePricesUpdated);
   }, [activeTab]);
 
   const toggleModule = (mod: AppModule) => {

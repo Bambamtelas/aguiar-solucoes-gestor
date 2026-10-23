@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   X,
   Check,
@@ -16,7 +16,7 @@ import {
   Layers,
   AlertCircle,
 } from 'lucide-react';
-import { Tenant, AppModule, calculatePlanPrice } from '../types/index.js';
+import { Tenant, AppModule, calculatePlanPrice, GlobalPlanPrices, DEFAULT_PLAN_PRICES } from '../types/index.js';
 import { api } from '../lib/api.js';
 
 interface AddModuleModalProps {
@@ -86,6 +86,22 @@ export const AddModuleModal: React.FC<AddModuleModalProps> = ({
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
   const [successMsg, setSuccessMsg] = useState<string | null>(null);
   const [pixCopied, setPixCopied] = useState(false);
+  const [globalPrices, setGlobalPrices] = useState<GlobalPlanPrices>(DEFAULT_PLAN_PRICES);
+
+  useEffect(() => {
+    let active = true;
+    api.getGlobalPlanPrices().then((p) => {
+      if (active && p) setGlobalPrices(p);
+    });
+    const handleUpdate = (e: CustomEvent<GlobalPlanPrices>) => {
+      if (e.detail) setGlobalPrices(e.detail);
+    };
+    window.addEventListener('global_plan_prices_updated' as any, handleUpdate);
+    return () => {
+      active = false;
+      window.removeEventListener('global_plan_prices_updated' as any, handleUpdate);
+    };
+  }, []);
 
   if (!isOpen) return null;
 
@@ -98,9 +114,9 @@ export const AddModuleModal: React.FC<AddModuleModalProps> = ({
   const availableToAdd = MODULES_INFO.filter((m) => !currentModules.includes(m.id));
 
   // Preço da adição unitária imediata e próximo mês
-  const unitAdditionPrice = isTrial ? 0 : 24.9;
+  const unitAdditionPrice = isTrial ? 0 : globalPrices.module_1;
   const newModuleCount = currentModules.length + 1;
-  const nextMonthComboPrice = calculatePlanPrice(newModuleCount);
+  const nextMonthComboPrice = calculatePlanPrice(newModuleCount, globalPrices);
 
   const handleCopyPix = () => {
     navigator.clipboard.writeText('rominhoaguiar2134@gmail.com');
@@ -185,7 +201,7 @@ export const AddModuleModal: React.FC<AddModuleModalProps> = ({
             <div className="text-left sm:text-right">
               <div className="text-[11px] text-slate-400">Mensalidade Atual:</div>
               <div className="text-base font-black text-emerald-400">
-                R$ {(tenant.plan_monthly_price || calculatePlanPrice(currentModules.length)).toFixed(2).replace('.', ',')} / mês
+                R$ {(tenant.plan_monthly_price || calculatePlanPrice(currentModules.length, globalPrices)).toFixed(2).replace('.', ',')} / mês
               </div>
             </div>
           </div>

@@ -39,11 +39,22 @@ export const SubscriptionModal: React.FC<SubscriptionModalProps> = ({
   const [globalPrices, setGlobalPrices] = useState<GlobalPlanPrices | null>(null);
 
   useEffect(() => {
-    api.getGlobalPlanPrices()
-      .then((prices) => {
-        if (prices) setGlobalPrices(prices);
-      })
-      .catch(() => {});
+    const loadPrices = () => {
+      api.getGlobalPlanPrices()
+        .then((prices) => {
+          if (prices) setGlobalPrices(prices);
+        })
+        .catch(() => {});
+    };
+    loadPrices();
+
+    const handlePricesUpdated = (e: any) => {
+      if (e?.detail) setGlobalPrices(e.detail);
+      else loadPrices();
+    };
+
+    window.addEventListener('global_plan_prices_updated', handlePricesUpdated);
+    return () => window.removeEventListener('global_plan_prices_updated', handlePricesUpdated);
   }, []);
 
   const currentPlanPrice =
