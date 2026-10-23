@@ -36,6 +36,7 @@ import {
   toggleInstallmentPaidInSupabase,
   deleteLoanFromSupabase,
 } from '../lib/supabaseLoans.js';
+import { createCustomerInSupabase } from '../lib/supabaseCustomers.js';
 import { isSupabaseConfigured } from '../lib/supabaseClient.js';
 
 // Authentic WhatsApp SVG Icon
@@ -415,6 +416,13 @@ export const LoansView: React.FC<LoansViewProps> = ({ tenant }) => {
 
         // Registra como cliente no sistema para aparecer na aba Clientes
         if (customerName.trim()) {
+          if (isSupabaseConfigured) {
+            createCustomerInSupabase(tenantId, {
+              tenant_id: tenantId,
+              name: customerName.trim(),
+              whatsapp: customerPhone.trim() || undefined,
+            }).catch(() => {});
+          }
           api
             .createCustomer({
               tenant_id: tenantId,

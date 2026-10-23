@@ -69,8 +69,8 @@ export function mapLoanToSupabaseRow(loan: Partial<Loan>, tenantId: string): Rec
   if (loan.paymentMethod !== undefined) row.payment_method = loan.paymentMethod;
   if (loan.instructions !== undefined) row.instructions = loan.instructions;
   if (loan.status !== undefined) row.status = loan.status;
-  if (loan.totalToReceive !== undefined) row.total_to_receive = Number(loan.totalToReceive);
-  if (loan.installments !== undefined) row.installments = loan.installments;
+  row.total_to_receive = Number(loan.totalToReceive ?? loan.principalAmount ?? 0);
+  row.installments = Array.isArray(loan.installments) ? loan.installments : [];
   if (loan.createdAt !== undefined) row.created_at = loan.createdAt;
 
   return row;
